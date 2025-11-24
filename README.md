@@ -15,6 +15,7 @@
 - Python 3.11+
 - OpenCV
 - YOLOv8 (ultralytics)
+- DeepSORT (`deep-sort-realtime`)
 
 ## Установка
 
@@ -23,11 +24,21 @@
    git clone https://github.com/ваш-логин/intrusion-detection-system.git
    cd intrusion-detection-system
 
-2. ```bash
+2. Установите зависимости:
+   ```bash
    pip install -r requirements.txt  # включает deep-sort-realtime
 
 ## Запуск
+Поместите видео (например, sample_video.mp4) в папку assets/, затем выполните:
+   ```bash
+   python -m src.main --video assets/sample_video.mp4   
 
-```bash
-python -m src.main --video assets/sample_video.mp4   
+Первый запуск: 
+Если файл config/restricted_zones.json отсутствует, программа автоматически перейдёт в режим разметки:
 
+Левый клик мыши — добавить точку полигона
+s — сохранить текущую зону
+n — начать новую зону
+q — завершить разметку и начать детекцию
+После завершения работы видео с наложенной тревогой будет сохранено в output/alarmed_video.mp4.
+```
