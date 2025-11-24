@@ -7,3 +7,4 @@ __pycache__/
 assets/
 # YOLO model 
 yolov8n.pt
+output/

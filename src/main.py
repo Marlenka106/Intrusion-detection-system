@@ -3,6 +3,7 @@ import argparse
 import os
 import json
 import cv2
+from src.tracker import DeepSortTracker
 from src.detector import YoloPersonDetector
 from src.zone_checker import is_point_in_any_zone, draw_zones
 import time
@@ -85,19 +86,35 @@ def annotation_mode(video_path):
 
 
 def detection_mode(video_path):
-    print("Запуск режима детекции с проверкой проникновения...")
+    print("Запуск режима детекции с DeepSORT и записью видео...")
     
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print("Не удалось открыть видео")
         return
 
+    # Получаем параметры видео
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    # Путь для записи
+    os.makedirs("output", exist_ok=True)
+    output_path = "output/alarmed_video.mp4"
+    video_writer = cv2.VideoWriter(
+        output_path,
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        fps,
+        (width, height)
+    )
+
     zones = load_zones()
     if not zones:
-        print("Нет запрещённых зон. Запустите разметку.")
+        print("Нет запрещённых зон.")
         return
 
     detector = YoloPersonDetector()
+    tracker = DeepSortTracker()
     alarm_active = False
     last_seen_in_zone_time = 0
 
@@ -108,20 +125,28 @@ def detection_mode(video_path):
             break
 
         current_time = time.time()
-        detections = detector.detect(frame)
-        someone_in_zone = False
 
-        # Проверка проникновения
-        for det in detections:
-            x1, y1, x2, y2 = det['bbox']
+        # Детекция → трекинг
+        raw_detections = detector.detect(frame)
+        tracked_objects = tracker.update(raw_detections, frame)
+
+        someone_in_zone = False
+        for obj in tracked_objects:
+            x1, y1, x2, y2 = obj['bbox']
             center = ((x1 + x2) // 2, (y1 + y2) // 2)
-            if is_point_in_any_zone(center, zones):
+            in_zone = is_point_in_any_zone(center, zones)
+            obj['in_zone'] = in_zone
+
+            if in_zone:
                 someone_in_zone = True
                 last_seen_in_zone_time = current_time
-                # Опционально: подсветить человека в зоне красным
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                cv2.putText(frame, f"ID:{obj['track_id']}", (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
             else:
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(frame, f"ID:{obj['track_id']}", (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
         # Логика тревоги
         if someone_in_zone:
@@ -134,12 +159,17 @@ def detection_mode(video_path):
         if alarm_active:
             cv2.putText(frame, "ALARM!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
 
+        # Запись кадра
+        video_writer.write(frame)
+
         cv2.imshow("Intrusion Detection", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     cap.release()
+    video_writer.release()
     cv2.destroyAllWindows()
+    print(f"Видео с тревогой сохранено: {output_path}")
 
 
 def main():
