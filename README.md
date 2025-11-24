@@ -20,3 +20,9 @@
    ```bash
    git clone https://github.com/ваш-логин/intrusion-detection-system.git
    cd intrusion-detection-system
+
+## Запуск
+
+```bash
+python -m src.main --video assets/sample_video.mp4   
+

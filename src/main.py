@@ -3,6 +3,8 @@ import argparse
 import os
 import json
 import cv2
+from src.detector import YoloPersonDetector
+import time
 
 CONFIG_PATH = "config/restricted_zones.json"
 
@@ -82,8 +84,33 @@ def annotation_mode(video_path):
 
 
 def detection_mode(video_path):
-    print("Запуск режима детекции (пока заглушка)")
-    print("В следующем шаге добавим YOLO и тревогу!")
+    print("Запуск режима детекции с YOLO...")
+    
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print("Не удалось открыть видео")
+        return
+
+    detector = YoloPersonDetector()
+
+    cv2.namedWindow("Intrusion Detection", cv2.WND_PROP_FULLSCREEN)
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # Детекция людей
+        detections = detector.detect(frame)
+        frame = detector.draw_detections(frame, detections)
+
+        # ПОКА НЕТ ПРОВЕРКИ ЗОН И ТРЕВОГИ — добавим в следующем шаге
+
+        cv2.imshow("Intrusion Detection", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
 
 
 def main():

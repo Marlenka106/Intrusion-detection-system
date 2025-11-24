@@ -6,3 +6,5 @@ __pycache__/
 .env
 assets/
 config/restricted_zones.json
+# YOLO model 
+yolov8n.pt
