@@ -4,6 +4,7 @@ import os
 import json
 import cv2
 from src.detector import YoloPersonDetector
+from src.zone_checker import is_point_in_any_zone, draw_zones
 import time
 
 CONFIG_PATH = "config/restricted_zones.json"
@@ -84,26 +85,54 @@ def annotation_mode(video_path):
 
 
 def detection_mode(video_path):
-    print("Запуск режима детекции с YOLO...")
+    print("Запуск режима детекции с проверкой проникновения...")
     
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print("Не удалось открыть видео")
         return
 
-    detector = YoloPersonDetector()
+    zones = load_zones()
+    if not zones:
+        print("Нет запрещённых зон. Запустите разметку.")
+        return
 
-    cv2.namedWindow("Intrusion Detection", cv2.WND_PROP_FULLSCREEN)
+    detector = YoloPersonDetector()
+    alarm_active = False
+    last_seen_in_zone_time = 0
+
+    cv2.namedWindow("Intrusion Detection", cv2.WND_PROP_AUTOSIZE)
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        # Детекция людей
+        current_time = time.time()
         detections = detector.detect(frame)
-        frame = detector.draw_detections(frame, detections)
+        someone_in_zone = False
 
-        # ПОКА НЕТ ПРОВЕРКИ ЗОН И ТРЕВОГИ — добавим в следующем шаге
+        # Проверка проникновения
+        for det in detections:
+            x1, y1, x2, y2 = det['bbox']
+            center = ((x1 + x2) // 2, (y1 + y2) // 2)
+            if is_point_in_any_zone(center, zones):
+                someone_in_zone = True
+                last_seen_in_zone_time = current_time
+                # Опционально: подсветить человека в зоне красным
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            else:
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+        # Логика тревоги
+        if someone_in_zone:
+            alarm_active = True
+        elif alarm_active and (current_time - last_seen_in_zone_time) >= 3.0:
+            alarm_active = False
+
+        # Отрисовка
+        frame = draw_zones(frame, zones)
+        if alarm_active:
+            cv2.putText(frame, "ALARM!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
 
         cv2.imshow("Intrusion Detection", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
