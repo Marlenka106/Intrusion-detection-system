@@ -157,7 +157,7 @@ def detection_mode(video_path):
         # Отрисовка
         frame = draw_zones(frame, zones)
         if alarm_active:
-            cv2.putText(frame, "ALARM!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
+            cv2.putText(frame, "ALARM!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 255), 3)
 
         # Запись кадра
         video_writer.write(frame)
